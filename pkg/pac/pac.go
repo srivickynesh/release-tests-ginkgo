@@ -10,7 +10,6 @@ import (
 	"github.com/xanzy/go-gitlab"
 
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -28,7 +27,7 @@ func InitGitLabClient() *gitlab.Client {
 	tokenSecretData := os.Getenv("GITLAB_TOKEN")
 	webhookSecretData := os.Getenv("GITLAB_WEBHOOK_TOKEN")
 	if tokenSecretData == "" && webhookSecretData == "" {
-		Fail(fmt.Sprintf("token for authorization to the GitLab repository was not exported as a system variable"))
+		fmt.Errorf("token for authorization to the GitLab repository was not exported as a system variable")
 	} else {
 		if !oc.SecretExists(webhookConfigName, store.Namespace()) {
 			oc.CreateSecretForWebhook(tokenSecretData, webhookSecretData, store.Namespace())

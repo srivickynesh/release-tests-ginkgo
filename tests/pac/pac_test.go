@@ -1,8 +1,7 @@
-package pac
+package pac_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
-
 	"github.com/srivickynesh/release-tests-ginkgo/pkg/pac"
 )
 
