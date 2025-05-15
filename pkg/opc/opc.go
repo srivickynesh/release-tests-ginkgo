@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getgauge-contrib/gauge-go/testsuit"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/srivickynesh/release-tests-ginkgo/pkg/cmd"
 	"gotest.tools/v3/icmd"
 )
@@ -55,7 +55,7 @@ func GetOPCServerVersion(component string) string {
 	}
 
 	if strings.Contains(version, "unknown") {
-		testsuit.T.Errorf("%s is not installed", titleComp)
+		Fail(fmt.Sprintf("%s is not installed", titleComp))
 	}
 	return version
 }
@@ -77,21 +77,21 @@ func AssertComponentVersion(version string, component string) {
 	case "manual-approval-gate":
 		actualVersion = cmd.MustSucceed("oc", "get", "manualapprovalgate", "manual-approval-gate", "-o", "jsonpath={.status.version}").Stdout()
 	default:
-		testsuit.T.Errorf("Unknown component")
+		Fail(fmt.Sprintln("Unknown component"))
 	}
 
 	actualVersion = strings.Trim(actualVersion, "\n")
 	if !strings.Contains(actualVersion, version) {
-		testsuit.T.Errorf("The %s has an unexpected version: %s, expected: %s", component, actualVersion, version)
+		Fail(fmt.Sprintf("The %s has an unexpected version: %s, expected: %s", component, actualVersion, version))
 	}
 }
 
 func DownloadCLIFromCluster() {
 	var architecture = strings.Trim(cmd.MustSucceed("uname").Stdout(), "\n") + " " + strings.Trim(cmd.MustSucceed("uname", "-m").Stdout(), "\n")
 	var cliDownloadURL = cmd.MustSucceed("oc", "get", "consoleclidownloads", "tkn", "-o", "jsonpath={.spec.links[?(@.text==\"Download tkn and tkn-pac for "+architecture+"\")].href}").Stdout()
-	result := cmd.MustSuccedIncreasedTimeout(time.Minute*10, "curl", "-o", "/tmp/tkn-binary.tar.gz", "-k", cliDownloadURL)
+	result := cmd.MustSucceedIncreasedTimeout(time.Minute*10, "curl", "-o", "/tmp/tkn-binary.tar.gz", "-k", cliDownloadURL)
 	if result.ExitCode != 0 {
-		testsuit.T.Errorf("%s", result.Stderr())
+		Fail(fmt.Sprintf("Expected exit code 0 but got %d", result.ExitCode))
 	}
 	cmd.MustSucceed("tar", "-xf", "/tmp/tkn-binary.tar.gz", "-C", "/tmp")
 }
@@ -104,7 +104,7 @@ func AssertClientVersion(binary string) {
 		commandResult = cmd.MustSucceed("/tmp/tkn-pac", "version").Stdout()
 		expectedVersion := os.Getenv("PAC_VERSION")
 		if !strings.Contains(commandResult, expectedVersion) {
-			testsuit.T.Errorf("tkn-pac has an unexpected version: %s. Expected: %s", commandResult, expectedVersion)
+			Fail(fmt.Sprintf("tkn-pac has an unexpected version: %s. Expected: %s", commandResult, expectedVersion))
 		}
 
 	case "tkn":
@@ -115,7 +115,7 @@ func AssertClientVersion(binary string) {
 			if strings.Contains(splittedCommandResult[i], "Client") {
 				if !strings.Contains(splittedCommandResult[i], expectedVersion) {
 					unexpectedVersion = splittedCommandResult[i]
-					testsuit.T.Errorf("tkn client has an unexpected version: %s. Expected: %s", unexpectedVersion, expectedVersion)
+					Fail(fmt.Sprintf("tkn client has an unexpected version: %s. Expected: %s", unexpectedVersion, expectedVersion))
 				}
 			}
 		}
@@ -129,13 +129,13 @@ func AssertClientVersion(binary string) {
 			if strings.Contains(splittedCommandResult[i], components[i]) {
 				if !strings.Contains(splittedCommandResult[i], expectedVersions[i]) {
 					unexpectedVersion = splittedCommandResult[i]
-					testsuit.T.Errorf("%s has an unexpected version: %s. Expected: %s", components[i], unexpectedVersion, expectedVersions[i])
+					Fail(fmt.Sprintf("%s has an unexpected version: %s. Expected: %s", components[i], unexpectedVersion, expectedVersions[i]))
 				}
 			}
 		}
 
 	default:
-		testsuit.T.Errorf("Unknown binary or client")
+		fmt.Errorf("Unknown binary or client")
 	}
 }
 
@@ -152,12 +152,12 @@ func AssertServerVersion(binary string) {
 			if strings.Contains(splittedCommandResult[i], components[i]) {
 				if !strings.Contains(splittedCommandResult[i], expectedVersions[i]) {
 					unexpectedVersion = splittedCommandResult[i]
-					testsuit.T.Errorf("%s has an unexpected version: %s. Expected: %s", components[i], unexpectedVersion, expectedVersions[i])
+					Fail(fmt.Sprintf("%s has an unexpected version: %s. Expected: %s", components[i], unexpectedVersion, expectedVersions[i]))
 				}
 			}
 		}
 	default:
-		testsuit.T.Errorf("Unknown binary or client")
+		fmt.Errorf("Unknown binary or client")
 	}
 
 }
@@ -250,7 +250,7 @@ func GetOpcPacInfoInstall() (*PacInfoInstall, error) {
 
 	// Verify install version is not empty
 	if pacInfo.PipelinesAsCode.InstallVersion == "" {
-		return nil, fmt.Errorf("output of 'opc pac info install' is empty or missing Pipelines as Code information")
+		return nil, Fail(fmt.Sprintf("output of 'opc pac info install' is empty or missing Pipelines as Code information"))
 	}
 
 	return &pacInfo, nil
@@ -262,7 +262,7 @@ func HubSearch(resource string) error {
 
 	if !strings.Contains(output, resource) {
 		log.Printf("Resource %q not found in opc hub search", resource)
-		return fmt.Errorf("hub search failed for %s", resource)
+		return Fail(fmt.Sprintf("hub search failed for %s", resource))
 	}
 	return nil
 }
@@ -271,14 +271,14 @@ func HubSearch(resource string) error {
 func GetOpcPrList(pipelineRunName, namespace string) ([]PipelineRunList, error) {
 	result, err := VerifyResourceListMatchesName("pipelinerun", pipelineRunName, namespace)
 	if err != nil {
-		testsuit.T.Errorf("Failed to get pipelinerun list: %v", err)
+		Fail(fmt.Sprintf("Failed to get pipelinerun list: %v", err))
 	}
 	output := strings.TrimSpace(result)
 	lines := strings.Split(output, "\n")
 
 	// Ensure output isn't empty
 	if len(lines) < 2 {
-		return nil, fmt.Errorf("unexpected pipelinerun output %s", output)
+		return nil, Fail(fmt.Sprintf("unexpected pipelinerun output %s", output))
 	}
 
 	var runs []PipelineRunList
@@ -332,7 +332,7 @@ func resourceExists(output, resourceName string) bool {
 func VerifyResourceListMatchesName(resourceType, name, namespace string) (string, error) {
 	output := cmd.MustSucceed("opc", resourceType, "list", "-n", namespace).Stdout()
 	if !resourceExists(output, name) {
-		return "", fmt.Errorf("%s %q not found in namespace %q", resourceType, name, namespace)
+		return "", Fail(fmt.Sprintf("%s %q not found in namespace %q", resourceType, name, namespace))
 	}
 	return output, nil
 }

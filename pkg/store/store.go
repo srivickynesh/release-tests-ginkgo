@@ -2,77 +2,132 @@ package store
 
 import (
 	"net/http"
+	"sync"
 
-	"github.com/getgauge-contrib/gauge-go/gauge"
 	"github.com/srivickynesh/release-tests-ginkgo/pkg/clients"
 	"github.com/srivickynesh/release-tests-ginkgo/pkg/opc"
 	"github.com/tektoncd/operator/test/utils"
 )
 
+// scenarioStore holds data for the current test scenario.
+var scenarioStore = make(map[string]interface{})
+var suiteStore = make(map[string]interface{})
+var mu sync.RWMutex
+
+// Namespace returns the stored namespace for the scenario.
 func Namespace() string {
-	return gauge.GetScenarioStore()["namespace"].(string)
+	mu.RLock()
+	defer mu.RUnlock()
+	if v, ok := scenarioStore["namespace"].(string); ok {
+		return v
+	}
+	return ""
 }
 
+// Clients returns the stored *Clients for the scenario, or nil if not set.
 func Clients() *clients.Clients {
-	switch cs := gauge.GetScenarioStore()["clients"].(type) {
-	case *clients.Clients:
+	mu.RLock()
+	defer mu.RUnlock()
+	if cs, ok := scenarioStore["clients"].(*clients.Clients); ok {
 		return cs
-	default:
-		return nil
 	}
+	return nil
 }
 
+// GetCRNames returns the stored ResourceNames for the scenario.
 func GetCRNames() utils.ResourceNames {
-	switch names := gauge.GetScenarioStore()["crnames"].(type) {
-	case utils.ResourceNames:
+	mu.RLock()
+	defer mu.RUnlock()
+	if names, ok := scenarioStore["crnames"].(utils.ResourceNames); ok {
 		return names
-	default:
-		return utils.ResourceNames{}
 	}
+	return utils.ResourceNames{}
 }
 
+// HttpResponse returns the stored HTTP response for the scenario.
 func HttpResponse() *http.Response {
-	switch cs := gauge.GetScenarioStore()["response"].(type) {
-	case *http.Response:
-		return cs
-	default:
-		return nil
+	mu.RLock()
+	defer mu.RUnlock()
+	if resp, ok := scenarioStore["response"].(*http.Response); ok {
+		return resp
 	}
+	return nil
 }
 
+// GetPayload returns the stored payload bytes for the scenario.
 func GetPayload() []byte {
-	switch cs := gauge.GetScenarioStore()["payload"].(type) {
-	case []byte:
-		return cs
-	default:
-		return nil
+	mu.RLock()
+	defer mu.RUnlock()
+	if p, ok := scenarioStore["payload"].([]byte); ok {
+		return p
 	}
+	return nil
 }
 
+// Opc returns the stored opc.Cmd for the suite, or panics if missing/wrong type.
 func Opc() opc.Cmd {
-	switch n := gauge.GetSuiteStore()["opc"].(type) {
-	case opc.Cmd:
-		return n
-	default:
-		panic("Error: type for opc is not as expected")
+	mu.RLock()
+	defer mu.RUnlock()
+	if v, ok := suiteStore["opc"].(opc.Cmd); ok {
+		return v
 	}
+	panic("store: opc Cmd not set or wrong type")
 }
 
+// PutScenarioData stores a string value under the given key for the scenario.
 func PutScenarioData(key, value string) {
-	gauge.GetScenarioStore()[key] = value
+	mu.Lock()
+	defer mu.Unlock()
+	scenarioStore[key] = value
 }
 
+// PutScenarioDataSlice stores a string slice under the given key for the scenario.
 func PutScenarioDataSlice(key string, value []string) {
-	gauge.GetScenarioStore()[key] = value
+	mu.Lock()
+	defer mu.Unlock()
+	scenarioStore[key] = value
 }
 
+// GetScenarioDataSlice retrieves a string slice stored under the given key.
 func GetScenarioDataSlice(key string) []string {
-	return gauge.GetScenarioStore()[key].([]string)
-}
-func GetScenarioData(key string) string {
-	return gauge.GetScenarioStore()[key].(string)
+	mu.RLock()
+	defer mu.RUnlock()
+	if v, ok := scenarioStore[key].([]string); ok {
+		return v
+	}
+	return nil
 }
 
+// GetScenarioData retrieves a string stored under the given key.
+func GetScenarioData(key string) string {
+	mu.RLock()
+	defer mu.RUnlock()
+	if v, ok := scenarioStore[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// TargetNamespace returns the stored targetNamespace for the scenario.
 func TargetNamespace() string {
-	return gauge.GetScenarioStore()["targetNamespace"].(string)
+	mu.RLock()
+	defer mu.RUnlock()
+	if v, ok := scenarioStore["targetNamespace"].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// PutSuiteData stores a value under the given key for the entire test suite.
+func PutSuiteData(key string, value interface{}) {
+	mu.Lock()
+	defer mu.Unlock()
+	suiteStore[key] = value
+}
+
+// GetSuiteData retrieves a value stored under the given key for the suite.
+func GetSuiteData(key string) interface{} {
+	mu.RLock()
+	defer mu.RUnlock()
+	return suiteStore[key]
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/user"
 	"path"
@@ -10,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/getgauge-contrib/gauge-go/testsuit"
 )
 
 const (
@@ -234,19 +233,24 @@ func TempFile(elem ...string) (string, error) {
 	return filepath.Join(path...), nil
 }
 
-func RemoveTempDir() {
-	var err error
-	tmp, _ := TempDir()
-	err = os.RemoveAll(tmp)
+func RemoveTempDir() error {
+	tmp, err := TempDir()
 	if err != nil {
-		testsuit.T.Errorf("Error: In deleting directory %s: %+v ", tmp, err)
+		return fmt.Errorf("failed to get temp dir: %w", err)
 	}
+	if err := os.RemoveAll(tmp); err != nil {
+		return fmt.Errorf("error deleting directory %s: %w", tmp, err)
+	}
+	return nil
 }
 
-func Path(elem ...string) string {
+func Path(elem ...string) (string, error) {
 	td := filepath.Join(Dir(), "..")
 	if _, err := os.Stat(td); os.IsNotExist(err) {
-		testsuit.T.Errorf("Error: in identifying test data path %s: %+v", td, err)
+		return "", fmt.Errorf("test data path not found: %s", td)
+	} else if err != nil {
+		return "", fmt.Errorf("unable to stat %s: %w", td, err)
 	}
-	return filepath.Join(append([]string{td}, elem...)...)
+	full := filepath.Join(append([]string{td}, elem...)...)
+	return full, nil
 }

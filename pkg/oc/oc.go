@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/getgauge-contrib/gauge-go/testsuit"
-	"github.com/srivickynesh/release-tests-ginkgo/pkg/cmd"
-	"github.com/srivickynesh/release-tests-ginkgo/pkg/config"
-	"github.com/srivickynesh/release-tests-ginkgo/pkg/store"
+	"github.com/openshift-pipelines/release-tests/pkg/cmd"
+	"github.com/openshift-pipelines/release-tests/pkg/config"
+	"github.com/openshift-pipelines/release-tests/pkg/store"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 // Create resources using oc command
@@ -67,9 +69,8 @@ func VerifyKubernetesEventsForEventListener(namespace string) {
 	startedEvent := strings.Contains(result.String(), "dev.tekton.event.triggers.started.v1")
 	successfulEvent := strings.Contains(result.String(), "dev.tekton.event.triggers.successful.v1")
 	doneEvent := strings.Contains(result.String(), "dev.tekton.event.triggers.done.v1")
-	if !startedEvent || !successfulEvent || !doneEvent {
-		testsuit.T.Errorf("No events for successful, done and started")
-	}
+	all := startedEvent && successfulEvent && doneEvent
+	Expect(all).To(BeTrue(), "No events for successful, done and started")
 }
 
 func UpdateTektonConfig(patch_data string) {
@@ -79,12 +80,11 @@ func UpdateTektonConfig(patch_data string) {
 func UpdateTektonConfigwithInvalidData(patch_data, errorMessage string) {
 	result := cmd.Run("oc", "patch", "tektonconfig", "config", "-p", patch_data, "--type=merge")
 	log.Printf("Output: %s\n", result.Stdout())
-	if result.ExitCode != 1 {
-		testsuit.T.Errorf("Expected exit code 1 but got %v", result.ExitCode)
-	}
-	if !strings.Contains(result.Stderr(), errorMessage) {
-		testsuit.T.Errorf("Expected error message substring %v in %v", errorMessage, result.Stderr())
-	}
+	Expect(result.ExitCode).To(Equal(1),
+		"Expected exit code 1 but got %d", result.ExitCode)
+
+	Expect(result.Stderr()).To(ContainSubstring(errorMessage),
+		"Expected stderr to contain %q but got %q", errorMessage, result.Stderr())
 }
 
 func AnnotateNamespace(namespace, annotation string) {
@@ -140,7 +140,7 @@ func EnableConsolePlugin() {
 		err := json.Unmarshal([]byte(json_output), &plugins)
 
 		if err != nil {
-			testsuit.T.Errorf("Could not parse consoles.operator.openshift.io CR: %v", err)
+			Fail(fmt.Sprintf("Could not parse consoles.operator.openshift.io CR: %v", err))
 		}
 
 		if slices.Contains(plugins, config.ConsolePluginDeployment) {
