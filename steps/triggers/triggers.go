@@ -1,0 +1,48 @@
+package triggers
+
+import (
+	"strconv"
+
+	"github.com/getgauge-contrib/gauge-go/gauge"
+	"github.com/srivickynesh/release-tests-ginkgo/pkg/store"
+	"github.com/srivickynesh/release-tests-ginkgo/pkg/triggers"
+)
+
+var _ = gauge.Step("Expose Event listener <elname>", func(elname string) {
+	routeurl := triggers.ExposeEventListner(store.Clients(), elname, store.Namespace())
+	store.PutScenarioData("route", routeurl)
+	store.PutScenarioData("elname", elname)
+})
+
+var _ = gauge.Step("Expose Event listener for TLS <elname>", func(elname string) {
+	routeurl := triggers.ExposeEventListenerForTLS(store.Clients(), elname, store.Namespace())
+	store.PutScenarioData("route", routeurl)
+	store.PutScenarioData("elname", elname)
+})
+
+var _ = gauge.Step("Expose Deployment config <elname> on port <port>", func(elname, port string) {
+	triggers.ExposeDeploymentConfig(store.Clients(), elname, port, store.Namespace())
+})
+
+var _ = gauge.Step("Mock post event with empty payload", func() {
+	gauge.GetScenarioStore()["response"] = triggers.MockPostEventWithEmptyPayload(store.GetScenarioData("route"))
+})
+
+var _ = gauge.Step("Assert eventlistener response", func() {
+	triggers.AssertElResponse(store.Clients(), store.HttpResponse(), store.GetScenarioData("elname"), store.Namespace())
+})
+
+var _ = gauge.Step("Cleanup Triggers", func() {
+	triggers.CleanupTriggers(store.Clients(), store.GetScenarioData("elname"), store.Namespace())
+})
+
+var _ = gauge.Step("Mock post event to <interceptor> interceptor with event-type <eventType>, payload <payload>, with TLS <tls>", func(interceptor, eventType, payload, tls string) {
+	isTLS, _ := strconv.ParseBool(tls)
+	gauge.GetScenarioStore()["response"] = triggers.MockPostEvent(store.GetScenarioData("route"), interceptor, eventType, payload, isTLS)
+})
+
+var _ = gauge.Step("Get route for eventlistener <elname>", func(elname string) {
+	routeurl := triggers.GetRoute(elname, store.Namespace())
+	store.PutScenarioData("route", routeurl)
+	store.PutScenarioData("elname", elname)
+})
