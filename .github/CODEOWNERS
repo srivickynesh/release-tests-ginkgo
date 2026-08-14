@@ -19,4 +19,3 @@ tests/                    @anithapriyanatarajan @bharatmajjiga @jayesh-garg @man
 # Dependency updates
 go.mod                    @anithapriyanatarajan @pramodbindal @srivickynesh
 go.sum                    @anithapriyanatarajan @pramodbindal @srivickynesh
-vendor/                   @anithapriyanatarajan @pramodbindal @srivickynesh
