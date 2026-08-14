@@ -5,7 +5,6 @@
 extend-exclude = [
     "go.sum",
     "testdata/",
-    "vendor/",
     "*.xml",
     "*.json",
     "*.yaml",

@@ -1,6 +1,9 @@
 # Reference repos (cloned for migration comparison)
 reference-repo/
 
+# Go module vendor tree
+vendor/
+
 # Generated test reports / artifacts
 *.xml
 test-reports/
