@@ -1,3 +1,6 @@
+# Dockerfile.CI — Full CI tooling image
+# Installs all test dependencies: Go, oc, ginkgo, tkn, cosign, rekor-cli, golangci-lint, etc.
+# Published as quay.io/openshift-pipeline/release-tests-ginkgo:latest
 FROM quay.io/fedora/fedora:44
 
 RUN dnf update -y &&\
@@ -14,7 +17,7 @@ RUN wget https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem \
     && update-ca-trust extract \
     || true
 
-ENV OC_VERSION=4.21
+ENV OC_VERSION=4.22
 RUN wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/fast-${OC_VERSION}/openshift-client-linux.tar.gz \
     -O /tmp/openshift-client.tar.gz &&\
     tar xzf /tmp/openshift-client.tar.gz -C /usr/bin oc &&\
@@ -40,7 +43,7 @@ RUN wget https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-
     tar xzf /tmp/rosa.tar.gz -C /usr/bin --no-same-owner rosa &&\
     rm /tmp/rosa.tar.gz
 
-ENV TKN_VERSION=1.22.0
+ENV TKN_VERSION=1.23.1
 RUN wget https://developers.redhat.com/content-gateway/rest/browse/pub/cgw/pipelines/${TKN_VERSION}/tkn-linux-amd64.tar.gz \
    -O /tmp/tkn.tar.gz &&\
    tar xzf /tmp/tkn.tar.gz -C /tmp &&\
@@ -49,26 +52,38 @@ RUN wget https://developers.redhat.com/content-gateway/rest/browse/pub/cgw/pipel
    rm -rf /tmp/tkn.tar.gz /tmp/tkn-*
 
 RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/bin/mc &&\
-    chmod u+x /usr/bin/mc
+    wget https://dl.min.io/client/mc/release/linux-amd64/mc.sha256sum -O /tmp/mc.sha256sum &&\
+    echo "$(awk '{print $1}' /tmp/mc.sha256sum)  /usr/bin/mc" | sha256sum -c - &&\
+    chmod u+x /usr/bin/mc && rm /tmp/mc.sha256sum
 
 # Install Ginkgo CLI — version must match github.com/onsi/ginkgo/v2 in go.mod
-ENV GINKGO_VERSION=v2.28.3
+ENV GINKGO_VERSION=v2.32.0
 RUN ln -s /usr/bin/oc /usr/bin/kubectl &&\
     go env -w GOPROXY="https://proxy.golang.org,direct" &&\
     go install github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION} &&\
     mv /root/go/bin/ginkgo /usr/bin/ginkgo &&\
     ginkgo version
 
-RUN wget https://github.com/sigstore/cosign/releases/download/v3.0.5/cosign-linux-amd64 -O /usr/bin/cosign && \
-    chmod a+x /usr/bin/cosign
+ENV COSIGN_VERSION=v3.1.3
+RUN wget https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64 -O /usr/bin/cosign && \
+    wget https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt -O /tmp/cosign_checksums.txt && \
+    grep ' cosign-linux-amd64$' /tmp/cosign_checksums.txt | sed 's|cosign-linux-amd64|/usr/bin/cosign|' | sha256sum -c - && \
+    chmod a+x /usr/bin/cosign && \
+    rm /tmp/cosign_checksums.txt
 
-RUN wget https://github.com/sigstore/rekor/releases/download/v1.5.1/rekor-cli-linux-amd64 -O /usr/bin/rekor-cli && \
-    chmod u+x /usr/bin/rekor-cli
+ENV REKOR_VERSION=v1.5.3
+RUN wget https://github.com/sigstore/rekor/releases/download/${REKOR_VERSION}/rekor-cli-linux-amd64 -O /usr/bin/rekor-cli && \
+    wget https://github.com/sigstore/rekor/releases/download/${REKOR_VERSION}/rekor_checksums.txt -O /tmp/rekor_checksums.txt && \
+    grep ' rekor-cli-linux-amd64$' /tmp/rekor_checksums.txt | sed 's|rekor-cli-linux-amd64|/usr/bin/rekor-cli|' | sha256sum -c - && \
+    chmod u+x /usr/bin/rekor-cli && \
+    rm /tmp/rekor_checksums.txt
 
-ENV GOLANGCI_LINT_VERSION=2.11.4
+ENV GOLANGCI_LINT_VERSION=2.12.2
 RUN wget -O /tmp/golangci-lint.tar.gz https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz \
+    && wget -O /tmp/golangci-lint-checksums.txt https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-checksums.txt \
+    && grep " golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz$" /tmp/golangci-lint-checksums.txt | sed "s|golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz|/tmp/golangci-lint.tar.gz|" | sha256sum -c - \
     && tar --strip-components=1 -C /usr/bin -xzf /tmp/golangci-lint.tar.gz golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint \
-    && rm -f /tmp/golangci-lint.tar.gz
+    && rm -f /tmp/golangci-lint.tar.gz /tmp/golangci-lint-checksums.txt
 
 ENV GOMODCACHE=/opt/go/pkg/mod
 COPY go.mod go.sum /tmp/release-tests-ginkgo-deps/

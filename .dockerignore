@@ -1,0 +1,21 @@
+# Exclude VCS and CI metadata
+.git
+.github
+
+# Exclude vendored deps
+vendor
+
+# Exclude docs (except README)
+*.md
+!README.md
+
+# Exclude lint/tool configs not needed at runtime
+.golangci.yml
+.typos.toml
+
+# Exclude secrets and local environment files
+.env
+*.pem
+*.key
+!testdata/triggers/certs/*.key
+kubeconfig*
