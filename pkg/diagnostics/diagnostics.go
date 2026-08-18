@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	testcmd "github.com/openshift-pipelines/release-tests-ginkgo/pkg/cmd"
+
 	. "github.com/onsi/ginkgo/v2" //nolint:revive,staticcheck // dot import is idiomatic for Ginkgo
 )
 
@@ -150,14 +152,13 @@ func collectPodLogs(namespace string) string {
 	return sb.String()
 }
 
-// runOC executes an oc command with a timeout context.
-// It uses exec.CommandContext directly (not pkg/cmd) to avoid test framework
-// assertions in the reporter context.
+// runOC executes oc with shared connection flags and returns command errors to the reporter.
 func runOC(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "oc", args...) //nolint:gosec // G204: subprocess args are controlled by test code
+	commandArgs := testcmd.Command(append([]string{"oc"}, args...)...)
+	cmd := exec.CommandContext(ctx, commandArgs[0], commandArgs[1:]...) //nolint:gosec // G204: subprocess args are controlled by test code
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

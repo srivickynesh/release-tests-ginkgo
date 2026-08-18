@@ -55,15 +55,35 @@ type Clients struct {
 	ApprovalTask apclient.ApprovalTaskInterface
 }
 
-// NewClients instantiates and returns several clientsets required for making request to the
-// TektonPipeline cluster specified by the combination of clusterName and configPath.
-func NewClients(configPath string, clusterName, namespace string) (*Clients, error) {
+// NewClients instantiates the clientsets using the selected kubeconfig and cluster.
+func NewClients(configPath, clusterName, namespace string) (*Clients, error) {
+	return newClients(configPath, clusterName, "", namespace)
+}
+
+// NewClientsWithContext instantiates the clientsets using an explicit context override.
+func NewClientsWithContext(configPath, clusterName, contextName, namespace string) (*Clients, error) {
+	return newClients(configPath, clusterName, contextName, namespace)
+}
+
+// newClients contains the shared clientset construction for both public entry points.
+func newClients(configPath, clusterName, contextName, namespace string) (*Clients, error) {
 	var err error
 	clients := &Clients{}
 
-	clients.KubeClient, clients.KubeConfig, err = NewKubeClient(configPath, clusterName)
+	connection := "standard kubeconfig loading rules"
+	if configPath != "" {
+		connection = fmt.Sprintf("kubeconfig %q", configPath)
+	}
+	if contextName != "" {
+		connection += fmt.Sprintf(", context %q", contextName)
+	}
+	if clusterName != "" {
+		connection += fmt.Sprintf(", cluster %q", clusterName)
+	}
+
+	clients.KubeClient, clients.KubeConfig, err = newKubeClient(configPath, clusterName, contextName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create kubeclient from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create kubeclient using %s: %w", connection, err)
 	}
 
 	// We poll, so set our limits high.
@@ -77,41 +97,45 @@ func NewClients(configPath string, clusterName, namespace string) (*Clients, err
 
 	clients.Dynamic, err = dynamic.NewForConfig(clients.KubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamic clients from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create dynamic clients using %s: %w", connection, err)
 	}
 
 	clients.Operator, err = newTektonOperatorAlphaClients(clients.KubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Operator v1alpha1 clients from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create Operator v1alpha1 clients using %s: %w", connection, err)
 	}
 
 	clients.OLM, err = olmversioned.NewForConfig(clients.KubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create olm clients from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create olm clients using %s: %w", connection, err)
 	}
 
 	clients.Tekton, err = pversioned.NewForConfig(clients.KubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pipeline clientset from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create pipeline clientset using %s: %w", connection, err)
 	}
 
 	clients.TriggersClient, err = triggersclientset.NewForConfig(clients.KubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create triggers clientset from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create triggers clientset using %s: %w", connection, err)
 	}
 
 	clients.PacClientset, err = pacclientset.NewForConfig(clients.KubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pac clientset from config file at %s: %w", configPath, err)
+		return nil, fmt.Errorf("failed to create pac clientset using %s: %w", connection, err)
 	}
 	clients.NewClientSet(namespace)
 	return clients, nil
 }
 
-// NewKubeClient instantiates and returns several clientsets required for making request to the
-// kube client specified by the combination of clusterName and configPath. Clients can make requests within namespace.
-func NewKubeClient(configPath string, clusterName string) (*KubeClient, *rest.Config, error) {
-	cfg, err := BuildClientConfig(configPath, clusterName)
+// NewKubeClient creates a Kubernetes client using the selected kubeconfig and cluster.
+func NewKubeClient(configPath, clusterName string) (*KubeClient, *rest.Config, error) {
+	return newKubeClient(configPath, clusterName, "")
+}
+
+// newKubeClient creates a Kubernetes client with an optional context override.
+func newKubeClient(configPath, clusterName, contextName string) (*KubeClient, *rest.Config, error) {
+	cfg, err := buildClientConfig(configPath, clusterName, contextName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -123,16 +147,23 @@ func NewKubeClient(configPath string, clusterName string) (*KubeClient, *rest.Co
 	return &KubeClient{Kube: k}, cfg, nil
 }
 
-// BuildClientConfig builds the client config specified by the config path and the cluster name
-func BuildClientConfig(kubeConfigPath string, clusterName string) (*rest.Config, error) {
-	overrides := clientcmd.ConfigOverrides{}
-	// Override the cluster name if provided.
+// BuildClientConfig builds a REST config using client-go's standard loading rules.
+func BuildClientConfig(kubeConfigPath, clusterName string) (*rest.Config, error) {
+	return buildClientConfig(kubeConfigPath, clusterName, "")
+}
+
+// buildClientConfig applies an optional context override to the standard loading rules.
+func buildClientConfig(kubeConfigPath, clusterName, contextName string) (*rest.Config, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if kubeConfigPath != "" {
+		loadingRules.ExplicitPath = kubeConfigPath
+	}
+
+	overrides := clientcmd.ConfigOverrides{CurrentContext: contextName}
 	if clusterName != "" {
 		overrides.Context.Cluster = clusterName
 	}
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath},
-		&overrides).ClientConfig()
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &overrides).ClientConfig()
 }
 
 func newTektonOperatorAlphaClients(cfg *rest.Config) (operatorv1alpha1.OperatorV1alpha1Interface, error) {
