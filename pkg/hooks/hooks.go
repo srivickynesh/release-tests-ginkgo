@@ -108,6 +108,25 @@ func AutoNamespacePerDescribe(namespacePtr *string, clientsFunc func() *clients.
 			}
 		}
 
+		// If the container opts out of auto-namespace management (Label("no-auto-namespace")),
+		// skip creation — the test manages its own static namespaces.
+		optOut := false
+		for _, clabels := range spec.ContainerHierarchyLabels {
+			for _, l := range clabels {
+				if l == "no-auto-namespace" {
+					optOut = true
+					break
+				}
+			}
+			if optOut {
+				break
+			}
+		}
+		if optOut {
+			manager.lastContainerPath = containerPath
+			return
+		}
+
 		// Check if we're in a new container that doesn't have a namespace yet
 		// For retries, containerPath includes attempt number, so this will be true
 		if _, exists := manager.containerToNS[containerPath]; !exists {
@@ -129,7 +148,7 @@ func AutoNamespacePerDescribe(namespacePtr *string, clientsFunc func() *clients.
 			manager.containerFailed[containerPath] = false // initialize failure tracking
 
 			log.Printf("Creating test namespace: %s for container: %s", ns, containerPath)
-			oc.CreateNewNamespace(ns)
+			oc.CreateNewProject(ns)
 
 			// Only wait for the pipeline SA if the operator is already installed.
 			// On a fresh cluster, the OLM install test creates the operator — the
@@ -152,6 +171,13 @@ func AutoNamespacePerDescribe(namespacePtr *string, clientsFunc func() *clients.
 			*namespacePtr = ns
 			// Also store in store package so oc.Apply() etc can use it without explicit namespace
 			store.SetNamespace(ns)
+			// Re-scope all namespace-bound clients (PipelineRunClient, TaskRunClient, etc.)
+			// to the current test namespace. sharedClients is initialized once in
+			// SynchronizedBeforeSuite with config.TargetNamespace; without this update,
+			// ValidatePipelineRun and similar helpers search in the wrong namespace.
+			if cs := clientsFunc(); cs != nil {
+				cs.NewClientSet(ns)
+			}
 		}
 	})
 
