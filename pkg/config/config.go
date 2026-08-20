@@ -2,6 +2,7 @@
 package config
 
 import (
+	"cmp"
 	"flag"
 	"fmt"
 	"log"
@@ -130,6 +131,39 @@ const (
 
 	// TriggersSecretToken is a token used in triggers tests.
 	TriggersSecretToken = "1234567"
+
+	// KueueNamespaceEnv configures the Kueue operator namespace.
+	KueueNamespaceEnv = "KUEUE_NAMESPACE"
+	// PipelinesNamespaceEnv configures the Pipelines operator namespace.
+	PipelinesNamespaceEnv = "PIPELINE_NAMESPACE"
+	// CertManagerNamespaceEnv configures the cert-manager operator namespace.
+	CertManagerNamespaceEnv = "CERTMANAGER_NAMESPACE"
+	// OperatorChannelPipeline configures the Pipelines operator channel.
+	OperatorChannelPipeline = "CHANNEL_PIPELINE"
+	// OperatorChannelCertManager configures the cert-manager operator channel.
+	OperatorChannelCertManager = "CHANNEL_CERTMANAGER"
+	// OperatorChannelKueue configures the Kueue operator channel.
+	OperatorChannelKueue = "CHANNEL_KUEUE"
+
+	// DefaultPipelineOperatorChannel is the default Pipelines operator channel.
+	DefaultPipelineOperatorChannel = "latest"
+	// DefaultCertManagerOperatorChannel is the default cert-manager operator channel.
+	DefaultCertManagerOperatorChannel = "stable-v1"
+	// DefaultKueueOperatorChannel is the default Kueue operator channel.
+	DefaultKueueOperatorChannel = "stable-v1.4"
+	// DefaultPipelineOperatorNamespace is the default Pipelines operator namespace.
+	DefaultPipelineOperatorNamespace = "openshift-operators"
+	// DefaultCertManagerOperatorNamespace is the default cert-manager operator namespace.
+	DefaultCertManagerOperatorNamespace = "cert-manager-operator"
+	// DefaultKueueOperatorNamespace is the default Kueue operator namespace.
+	DefaultKueueOperatorNamespace = "openshift-kueue-operator"
+
+	// PipelineOperatorPackageName is the Pipelines OLM package name.
+	PipelineOperatorPackageName = "openshift-pipelines-operator-rh"
+	// CertManagerOperatorPackageName is the cert-manager OLM package name.
+	CertManagerOperatorPackageName = "openshift-cert-manager-operator"
+	// KueueOperatorPackageName is the Kueue OLM package name.
+	KueueOperatorPackageName = "kueue-operator"
 )
 
 // TektonInstallersetNamePrefixes lists the name prefixes of all TektonInstallerSet resources.
@@ -201,21 +235,27 @@ func (s *StringArray) Set(value string) error {
 
 // EnvironmentFlags define the flags that are needed to run the e2e tests.
 type EnvironmentFlags struct {
-	Cluster          string      // K8s cluster override
-	Kubeconfig       string      // Explicit kubeconfig file; empty uses standard client-go loading rules
-	Context          string      // K8s context override
-	SpokeKubeconfigs StringArray // Path to Spoke kubeconfig (No Defaults)
-	SpokeContexts    StringArray // Name of the  Spoke Context (defaults to CurrentContext from SpokeKubeconfig)
-	DockerRepo       string      // Docker repo (defaults to $KO_DOCKER_REPO)
-	CSV              string      // Default csv openshift-pipelines-operator.v0.9.1
-	Channel          string      // Default channel canary
-	CatalogSource    string
-	SubscriptionName string
-	InstallPlan      string // Default Installationplan Automatic
-	OperatorVersion  string
-	TknVersion       string
-	ClusterArch      string // Architecture of the cluster
-	IsDisconnected   bool
+	Cluster                      string      // K8s cluster override
+	Kubeconfig                   string      // Explicit kubeconfig file; empty uses standard client-go loading rules
+	Context                      string      // K8s context override
+	SpokeKubeconfigs             StringArray // Path to Spoke kubeconfig (No Defaults)
+	SpokeContexts                StringArray // Name of the  Spoke Context (defaults to CurrentContext from SpokeKubeconfig)
+	DockerRepo                   string      // Docker repo (defaults to $KO_DOCKER_REPO)
+	CSV                          string      // Default csv openshift-pipelines-operator.v0.9.1
+	Channel                      string      // Default channel canary
+	CatalogSource                string
+	SubscriptionName             string
+	InstallPlan                  string // Default Installationplan Automatic
+	OperatorVersion              string
+	TknVersion                   string
+	ClusterArch                  string // Architecture of the cluster
+	IsDisconnected               bool
+	KueueOperatorNamespace       string
+	PipelinesOperatorNamespace   string
+	CertManagerOperatorNamespace string
+	PipelineOperatorChannel      string
+	CertManagerOperatorChannel   string
+	KueueOperatorChannel         string
 }
 
 func initializeFlags() *EnvironmentFlags {
@@ -235,10 +275,28 @@ func initializeFlags() *EnvironmentFlags {
 	flag.Var(&f.SpokeKubeconfigs, "spoke-kubeconfig",
 		"Provide the path to the `kubeconfig` file you'd like to use for these spoke tests.")
 
-	// SpokeKubeconfig is a Kubeconfig file which points to Spoke Cluster in MultiCluster environment.
-	// When SpokeKubeconfig is not provided then there is no default.
+	// SpokeContexts optionally selects one context per spoke kubeconfig.
 	flag.Var(&f.SpokeContexts, "spoke-context",
-		"Provide the path to the `kubeconfig` file you'd like to use for these spoke tests.")
+		"Provide one context name per spoke kubeconfig.")
+
+	flag.StringVar(&f.KueueOperatorNamespace, "kueue-namespace",
+		cmp.Or(os.Getenv(KueueNamespaceEnv), DefaultKueueOperatorNamespace),
+		"Provide the namespace for the Kueue operator.")
+	flag.StringVar(&f.PipelinesOperatorNamespace, "pipelines-namespace",
+		cmp.Or(os.Getenv(PipelinesNamespaceEnv), DefaultPipelineOperatorNamespace),
+		"Provide the namespace for the Pipelines operator.")
+	flag.StringVar(&f.CertManagerOperatorNamespace, "cert-manager-namespace",
+		cmp.Or(os.Getenv(CertManagerNamespaceEnv), DefaultCertManagerOperatorNamespace),
+		"Provide the namespace for the cert-manager operator.")
+	flag.StringVar(&f.PipelineOperatorChannel, "pipelines-channel",
+		cmp.Or(os.Getenv(OperatorChannelPipeline), DefaultPipelineOperatorChannel),
+		"Provide the Pipelines operator channel.")
+	flag.StringVar(&f.CertManagerOperatorChannel, "cert-manager-channel",
+		cmp.Or(os.Getenv(OperatorChannelCertManager), DefaultCertManagerOperatorChannel),
+		"Provide the cert-manager operator channel.")
+	flag.StringVar(&f.KueueOperatorChannel, "kueue-channel",
+		cmp.Or(os.Getenv(OperatorChannelKueue), DefaultKueueOperatorChannel),
+		"Provide the Kueue operator channel.")
 
 	defaultRepo := os.Getenv("KO_DOCKER_REPO")
 	flag.StringVar(&f.DockerRepo, "dockerrepo", defaultRepo,

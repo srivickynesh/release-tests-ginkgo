@@ -51,12 +51,29 @@ func TestBuildClientConfigUsesContextCredentialsWithClusterOverride(t *testing.T
 		t.Fatal(err)
 	}
 
-	cfg, err := buildClientConfig(path, "override-cluster", "selected-context")
+	cfg, err := BuildClientConfigWithContext(path, "override-cluster", "selected-context")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.Host != "https://override.example.test" || cfg.BearerToken != "context-token" {
 		t.Fatalf("selected host/token = %q/%q", cfg.Host, cfg.BearerToken)
+	}
+}
+
+func TestNewClientFromKubeconfigRequiresScheme(t *testing.T) {
+	path := writeKubeconfig(t, "spoke", "https://spoke.example.test", "spoke-token")
+
+	_, err := (&Clients{}).NewClientFromKubeconfig(path, "", "")
+	if err == nil || !strings.Contains(err.Error(), "configured scheme") {
+		t.Fatalf("NewClientFromKubeconfig() error = %v, want missing scheme error", err)
+	}
+
+	controllerClient, err := (&Clients{Scheme: createScheme()}).NewClientFromKubeconfig(path, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controllerClient == nil {
+		t.Fatal("controller-runtime client was not initialized")
 	}
 }
 

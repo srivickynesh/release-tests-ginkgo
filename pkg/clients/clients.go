@@ -5,13 +5,16 @@ import (
 	"context"
 	"fmt"
 
+	pacclientset "github.com/openshift-pipelines/pipelines-as-code/pkg/generated/clientset/versioned/typed/pipelinesascode/v1alpha1"
+	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
+	olm "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	pacclientset "github.com/openshift-pipelines/pipelines-as-code/pkg/generated/clientset/versioned/typed/pipelinesascode/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apclient "github.com/openshift-pipelines/manual-approval-gate/pkg/client/clientset/versioned/typed/approvaltask/v1alpha1"
 	configV1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -23,6 +26,7 @@ import (
 	pversioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	v1 "github.com/tektoncd/pipeline/pkg/client/clientset/versioned/typed/pipeline/v1"
 	triggersclientset "github.com/tektoncd/triggers/pkg/client/clientset/versioned"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // KubeClient holds instances of interfaces for making requests to kubernetes client.
@@ -68,7 +72,11 @@ func NewClientsWithContext(configPath, clusterName, contextName, namespace strin
 // newClients contains the shared clientset construction for both public entry points.
 func newClients(configPath, clusterName, contextName, namespace string) (*Clients, error) {
 	var err error
-	clients := &Clients{}
+	scheme := createScheme()
+
+	clients := &Clients{
+		Scheme: scheme,
+	}
 
 	connection := "standard kubeconfig loading rules"
 	if configPath != "" {
@@ -152,6 +160,11 @@ func BuildClientConfig(kubeConfigPath, clusterName string) (*rest.Config, error)
 	return buildClientConfig(kubeConfigPath, clusterName, "")
 }
 
+// BuildClientConfigWithContext builds a REST config with an explicit context override.
+func BuildClientConfigWithContext(kubeConfigPath, clusterName, contextName string) (*rest.Config, error) {
+	return buildClientConfig(kubeConfigPath, clusterName, contextName)
+}
+
 // buildClientConfig applies an optional context override to the standard loading rules.
 func buildClientConfig(kubeConfigPath, clusterName, contextName string) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
@@ -231,4 +244,35 @@ func (c *Clients) NewClientSet(namespace string) {
 	c.ConsoleCLIDownload = consolev1.NewForConfigOrDie(c.KubeConfig).ConsoleCLIDownloads()
 	c.ApprovalTask = apclient.NewForConfigOrDie(c.KubeConfig).ApprovalTasks(namespace)
 	c.PacClientset = pacclientset.NewForConfigOrDie(c.KubeConfig)
+}
+
+// NewClientFromKubeconfig creates a controller-runtime client from the provided kubeconfig.
+func (c *Clients) NewClientFromKubeconfig(kubeconfigPath, clusterName, contextName string) (client.Client, error) {
+	config, err := BuildClientConfigWithContext(kubeconfigPath, clusterName, contextName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build REST config from kubeconfig: %w", err)
+	}
+
+	if c == nil {
+		return nil, fmt.Errorf("cannot create controller-runtime client from a nil Clients receiver")
+	}
+	if c.Scheme == nil {
+		return nil, fmt.Errorf("cannot create controller-runtime client without a configured scheme")
+	}
+
+	k8sClient, err := client.New(config, client.Options{Scheme: c.Scheme})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create controller-runtime client: %w", err)
+	}
+	return k8sClient, nil
+}
+
+func createScheme() *runtime.Scheme {
+	// Register standard Kubernetes API types to the scheme
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(olm.AddToScheme(scheme))
+	utilruntime.Must(operatorsv1.AddToScheme(scheme))
+
+	return scheme
 }
