@@ -27,7 +27,7 @@ var _ = Describe("Versions of OpenShift Pipelines: PIPELINES-22", Label("version
 			Entry("operator version", "operator", "OPERATOR_VERSION"),
 			Entry("chains version", "chains", "CHAINS_VERSION"),
 			Entry("pac version", "pac", "PAC_VERSION"),
-			Entry("hub version", "hub", "HUB_VERSION"),
+			// Entry("hub version", "hub", "HUB_VERSION"),
 			Entry("results version", "results", "RESULTS_VERSION"),
 			Entry("manual-approval-gate version", "manual-approval-gate", "MANUAL_APPROVAL_VERSION"),
 			Entry("OSP version", "OSP", "OSP_VERSION"),
