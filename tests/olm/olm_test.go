@@ -142,9 +142,10 @@ var _ = Describe("OLM Operator Lifecycle: PIPELINES-09", Serial, Label("olm", "a
 			opc.ValidateQuickstarts()
 		})
 
-		It("validates default auto prune cronjob", func() {
-			operator.ValidateAutoPruneCronjob(sharedClients)
-		})
+		// Legacy CronJob pruner is no longer created by default.
+		// It("validates default auto prune cronjob", func() {
+		// 	operator.ValidateAutoPruneCronjob(sharedClients)
+		// })
 
 		It("applies MAG resource", func() {
 			oc.Apply("testdata/manualapprovalgate/manual-approval-gate.yaml", "")
