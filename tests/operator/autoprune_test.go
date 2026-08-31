@@ -13,7 +13,9 @@ import (
 	"github.com/openshift-pipelines/release-tests-ginkgo/pkg/store"
 )
 
-var _ = Describe("Verify auto-prune E2E: PIPELINES-12", Serial,
+// Legacy job-based pruner (spec.pruner CronJobs). Disabled because OSP no longer
+// ships a default tekton-resource-pruner CronJob; event-based coverage is PIPELINES-36.
+var _ = Describe("Verify auto-prune E2E: PIPELINES-12", Serial, Pending,
 	Label("e2e", "integration", "operator", "auto-prune", "admin"), func() {
 
 		BeforeEach(func() {

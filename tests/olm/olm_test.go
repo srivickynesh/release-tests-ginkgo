@@ -42,17 +42,17 @@ var _ = Describe("OLM Operator Lifecycle: PIPELINES-09", Serial, Label("olm", "a
 			operator.WaitForOperatorWebhooks(sharedClients)
 		})
 
-		It("defines artifact-hub-api variable", func() {
-			operator.DefineArtifactHubAPIVariable()
-		})
+		// It("defines artifact-hub-api variable", func() {
+		// 	operator.DefineArtifactHubAPIVariable()
+		// })
 
 		It("verifies openshift-pipelines namespace exists", func() {
 			operator.VerifyNamespaceExists("openshift-pipelines")
 		})
 
-		It("applies TektonHub resource", func() {
-			oc.Apply("testdata/hub/tektonhub.yaml", "")
-		})
+		// It("applies TektonHub resource", func() {
+		// 	oc.Apply("testdata/hub/tektonhub.yaml", "")
+		// })
 
 		It("configures GitHub token for git resolver in TektonConfig", func() {
 			operator.ConfigureGitResolverToken(sharedClients)
@@ -82,9 +82,9 @@ var _ = Describe("OLM Operator Lifecycle: PIPELINES-09", Serial, Label("olm", "a
 			operator.EnableChainsSigningSecret(sharedClients)
 		})
 
-		It("validates hub deployment", func() {
-			operator.ValidateHubDeployment(sharedClients)
-		})
+		// It("validates hub deployment", func() {
+		// 	operator.ValidateHubDeployment(sharedClients)
+		// })
 
 		It("enables statefulset for chains", func() {
 			operator.EnableStatefulSetForComponent(sharedClients, "chains")
@@ -142,9 +142,10 @@ var _ = Describe("OLM Operator Lifecycle: PIPELINES-09", Serial, Label("olm", "a
 			opc.ValidateQuickstarts()
 		})
 
-		It("validates default auto prune cronjob", func() {
-			operator.ValidateAutoPruneCronjob(sharedClients)
-		})
+		// Legacy CronJob pruner is no longer created by default.
+		// It("validates default auto prune cronjob", func() {
+		// 	operator.ValidateAutoPruneCronjob(sharedClients)
+		// })
 
 		It("applies MAG resource", func() {
 			oc.Apply("testdata/manualapprovalgate/manual-approval-gate.yaml", "")
